@@ -1,10 +1,12 @@
 import * as React from "react";
-import Header from "./Header";
-import HeroList, { HeroListItem } from "./HeroList";
-import TextInsertion from "./TextInsertion";
+import { useState } from "react";
 import { makeStyles } from "@fluentui/react-components";
-import { Ribbon24Regular, LockOpen24Regular, DesignIdeas24Regular } from "@fluentui/react-icons";
-import { insertText } from "../taskpane";
+
+import TaskTypeSelector from "./TaskTypeSelector";
+import SkillList from "./SkillList";
+import RealTimeAssessment from "./RealTimeAssessment";
+import ChatInterface from "./ChatInterface";
+import Feedback from "./Feedback";
 
 interface AppProps {
   title: string;
@@ -13,33 +15,33 @@ interface AppProps {
 const useStyles = makeStyles({
   root: {
     minHeight: "100vh",
+    padding: "20px",
   },
 });
 
-const App: React.FC<AppProps> = (props: AppProps) => {
+const App: React.FC<AppProps> = () => {
+  const [skills, setSkills] = useState([]);
   const styles = useStyles();
-  // The list items are static and won't change at runtime,
-  // so this should be an ordinary const, not a part of state.
-  const listItems: HeroListItem[] = [
-    {
-      icon: <Ribbon24Regular />,
-      primaryText: "Achieve more with Office integration",
-    },
-    {
-      icon: <LockOpen24Regular />,
-      primaryText: "Unlock features and functionality",
-    },
-    {
-      icon: <DesignIdeas24Regular />,
-      primaryText: "Create and visualize like a pro",
-    },
-  ];
+
+  const handleTaskSelect = (task) => {
+    // Assume taskTypeSkillsMap is an object mapping task types to skills arrays
+    const taskTypeSkillsMap = {
+      essay: ["Thesis Statement", "Argument Development", "Conclusion"],
+      report: ["Data Analysis", "Executive Summary", "Methodology"],
+      creative: ["Imagery", "Narrative Structure", "Character Development"],
+    };
+
+    setSkills(taskTypeSkillsMap[task] || []);
+  };
 
   return (
     <div className={styles.root}>
-      <Header logo="assets/logo-filled.png" title={props.title} message="Welcome" />
-      <HeroList message="Discover what this add-in can do for you today!" items={listItems} />
-      <TextInsertion insertText={insertText} />
+      <TaskTypeSelector onSelectTask={handleTaskSelect} />
+      <SkillList skills={skills} />
+      <RealTimeAssessment skill="Thesis Statement" level={80} />
+      <RealTimeAssessment skill="Argument Development" level={60} />
+      <ChatInterface />
+      <Feedback />
     </div>
   );
 };
