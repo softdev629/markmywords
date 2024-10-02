@@ -67,13 +67,17 @@ const App: React.FC = () => {
     // Here you would call the Mark My Words API to annotate the document based on the selected task type
 
     await Word.run(async (context) => {
-      const commentObj: Word.Comment = context.document.getSelection().insertComment("Commented");
+      const results: Word.RangeCollection = context.document.body.search("it");
+      results.load("length");
 
-      // Load object to log in the console.
-      commentObj.load();
       await context.sync();
 
-      console.log("Comment inserted:", commentObj);
+      // Let's traverse the search results and highlight matches.
+      for (let i = 0; i < results.items.length; i++) {
+        results.items[i].insertComment("Commented!!!");
+      }
+
+      await context.sync();
     });
   };
 
