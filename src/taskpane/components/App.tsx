@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { MessageSquare, FileText, BarChart2, Zap, History, Send } from "lucide-react";
+import { MessageSquare, BarChart2, Zap, History, Send } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { ToastContainer, toast } from "react-toastify";
 
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -55,29 +56,47 @@ const App: React.FC = () => {
   const [progressData, setProgressData] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
-
   const [tabKey, setTabKey] = useState("analyze");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setCurrentSkills(skillSets[selectedTask]);
   }, [selectedTask]);
 
   const handleAnnotate = async () => {
-    console.log("Annotating document for task type:", selectedTask);
-    // Here you would call the Mark My Words API to annotate the document based on the selected task type
-
+    setLoading(true);
     await Word.run(async (context) => {
-      const results: Word.RangeCollection = context.document.body.search("it");
-      results.load("length");
+      // Get the whole body of the document
+      const documentBody = context.document.body;
 
+      // Load the text content of the body
+      documentBody.load("text");
+
+      // Synchronize the context state with the document
       await context.sync();
 
-      // Let's traverse the search results and highlight matches.
-      for (let i = 0; i < results.items.length; i++) {
-        results.items[i].insertComment("Commented!!!");
-      }
+      // Retrieve and log the full text content
+      const wholeText = documentBody.text;
 
-      await context.sync();
+      fetch("http://localhost:8000/api/annotate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ context: wholeText }),
+      })
+        .then((res) => res.json())
+        .then(async ({ data }: { data: { subpart: string; comment: string }[] }) => {
+          console.log(data);
+          for (let item of data) {
+            const searchResults: Word.RangeCollection = context.document.body.search(item.subpart);
+            const firstResult = searchResults.getFirstOrNullObject();
+            if (firstResult) firstResult.insertComment(item.comment);
+            await context.sync();
+          }
+          setLoading(false);
+          toast.success("Annotation complete successfully!", { position: "top-right" });
+        });
     });
   };
 
@@ -109,7 +128,8 @@ const App: React.FC = () => {
 
   return (
     <div className="h-full w-full">
-      <div className="flex flex-col min-h-screen max-w-md mx-auto bg-background text-foreground">
+      <ToastContainer />
+      <div className="flex flex-col min-h-screen max-w-md mx-auto bg-background text-foreground relative">
         <Card className="border-none rounded-none">
           <CardHeader>
             <CardTitle className="text-2xl font-bold">Mark My Words</CardTitle>
@@ -118,9 +138,7 @@ const App: React.FC = () => {
           <CardContent className="space-y-4">
             <Select onValueChange={setSelectedTask} defaultValue={selectedTask}>
               {taskTypes.map((task) => (
-                <SelectItem key={task.value} value={task.value}>
-                  {task.label}
-                </SelectItem>
+                <SelectItem value={task.value}>{task.label}</SelectItem>
               ))}
             </Select>
             <div className="flex space-x-2">
@@ -236,6 +254,14 @@ const App: React.FC = () => {
             </div>
           </TabsContent>
         </Tabs>
+        {loading && (
+          <div
+            className="absolute w-full h-full flex items-center justify-center"
+            style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
+          >
+            <div className="lds-dual-ring" />
+          </div>
+        )}
       </div>
     </div>
   );
