@@ -58,6 +58,8 @@ const App: React.FC = () => {
   const [inputMessage, setInputMessage] = useState("");
   const [tabKey, setTabKey] = useState("analyze");
   const [loading, setLoading] = useState(false);
+  const [annotations, setAnnotations] = useState<{ subpart; comment }[]>([]);
+  const [context, setContext] = useState("");
 
   useEffect(() => {
     setCurrentSkills(skillSets[selectedTask]);
@@ -77,6 +79,7 @@ const App: React.FC = () => {
 
       // Retrieve and log the full text content
       const wholeText = documentBody.text;
+      setContext(wholeText);
 
       fetch("http://localhost:8000/api/annotate", {
         method: "POST",
@@ -87,7 +90,7 @@ const App: React.FC = () => {
       })
         .then((res) => res.json())
         .then(async ({ data }: { data: { subpart: string; comment: string }[] }) => {
-          console.log(data);
+          setAnnotations(data);
           for (let item of data) {
             const searchResults: Word.RangeCollection = context.document.body.search(item.subpart);
             const firstResult = searchResults.getFirstOrNullObject();
@@ -119,17 +122,42 @@ const App: React.FC = () => {
   const handleSendMessage = () => {
     if (inputMessage.trim()) {
       setChatMessages([...chatMessages, { text: inputMessage, sender: "user" }]);
+
+      let reqData = {
+        context,
+        annotations,
+        messages: [
+          ...chatMessages.map((item) => ({
+            role: item.sender === "bot" ? "assistant" : "user",
+            content: item.text,
+          })),
+          {
+            role: "user",
+            content: inputMessage,
+          },
+        ],
+      };
+
       setInputMessage("");
-      setTimeout(() => {
-        setChatMessages((prev) => [...prev, { text: "This is a sample response.", sender: "bot" }]);
-      }, 1000);
+
+      console.log(reqData);
+
+      fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        body: JSON.stringify(reqData),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+        .then((res) => res.json())
+        .then(({ data }) => setChatMessages((prev) => [...prev, { text: data.message, sender: "bot" }]));
     }
   };
 
   return (
     <div className="h-full w-full">
       <ToastContainer />
-      <div className="flex flex-col min-h-screen max-w-md mx-auto bg-background text-foreground relative">
+      <div className="flex flex-col h-screen max-w-md mx-auto bg-background text-foreground relative">
         <Card className="border-none rounded-none">
           <CardHeader>
             <CardTitle className="text-2xl font-bold">Mark My Words</CardTitle>
