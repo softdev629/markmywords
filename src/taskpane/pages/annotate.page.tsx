@@ -1,57 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { MessageSquare, BarChart2, Zap, History, Send } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { ToastContainer, toast } from "react-toastify";
+import { toast } from "react-toastify";
 
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
-import { Select, SelectItem } from "./ui/select";
-import { Progress } from "./ui/progress";
-import { ScrollArea } from "./ui/scroll-area";
+import { Button } from "../components/button";
+import { Input } from "../components/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/tabs";
+import { Card, CardHeader, CardTitle, CardContent } from "../components/card";
+import { Select, SelectItem } from "../components/select";
+import { Progress } from "../components/progress";
+import { ScrollArea } from "../components/scroll-area";
 
 const taskTypes = [
   { value: "creative", label: "Creative Writing" },
   { value: "persuasive", label: "Persuasive Essay" },
-  { value: "analytical", label: "Analytical Response" },
-  { value: "research", label: "Research Paper" },
+  { value: "informative", label: "Informative Writing" },
 ];
 
 const skillSets = {
-  creative: [
-    { name: "Creativity", score: 75 },
-    { name: "Narrative Structure", score: 68 },
-    { name: "Character Development", score: 82 },
-    { name: "Descriptive Language", score: 70 },
-    { name: "Emotional Impact", score: 65 },
-  ],
-  persuasive: [
-    { name: "Argumentation", score: 72 },
-    { name: "Evidence Use", score: 68 },
-    { name: "Logical Flow", score: 75 },
-    { name: "Persuasive Techniques", score: 70 },
-    { name: "Counter-Arguments", score: 65 },
-  ],
-  analytical: [
-    { name: "Critical Thinking", score: 78 },
-    { name: "Text Analysis", score: 72 },
-    { name: "Interpretation", score: 70 },
-    { name: "Supporting Evidence", score: 75 },
-    { name: "Analytical Structure", score: 68 },
-  ],
-  research: [
-    { name: "Research Depth", score: 70 },
-    { name: "Source Credibility", score: 75 },
-    { name: "Citation Accuracy", score: 68 },
-    { name: "Synthesis of Information", score: 72 },
-    { name: "Academic Writing Style", score: 70 },
-  ],
+  creative: ["Introduction", "Audience", "Descriptive Language", "Characterisation", "Dialogue", "Expression"],
+  persuasive: ["Stance", "Readers", "Reasons", "Evidence", "Appeal", "Counterpoints", "Action", "Techniques"],
+  informative: ["Topic", "Audience", "Facts", "Organisatione", "Examples", "Objectivity"],
 };
 
-const App: React.FC = () => {
+const AnnotationPage: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState("creative");
-  const [currentSkills, setCurrentSkills] = useState(skillSets.creative);
+  const [currentSkills, setCurrentSkills] = useState([]);
   const [drafts, setDrafts] = useState([]);
   const [progressData, setProgressData] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
@@ -60,10 +34,6 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [annotations, setAnnotations] = useState<{ subpart; comment }[]>([]);
   const [context, setContext] = useState("");
-
-  useEffect(() => {
-    setCurrentSkills(skillSets[selectedTask]);
-  }, [selectedTask]);
 
   const handleAnnotate = async () => {
     setLoading(true);
@@ -81,25 +51,35 @@ const App: React.FC = () => {
       const wholeText = documentBody.text;
       setContext(wholeText);
 
+      console.log({ context: wholeText, task: selectedTask, skillSet: skillSets[selectedTask] });
+
       fetch("http://localhost:8000/api/annotate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ context: wholeText }),
+        body: JSON.stringify({ context: wholeText, task: selectedTask, skillSet: skillSets[selectedTask] }),
       })
         .then((res) => res.json())
-        .then(async ({ data }: { data: { subpart: string; comment: string }[] }) => {
-          setAnnotations(data);
-          for (let item of data) {
-            const searchResults: Word.RangeCollection = context.document.body.search(item.subpart);
-            const firstResult = searchResults.getFirstOrNullObject();
-            if (firstResult) firstResult.insertComment(item.comment);
-            await context.sync();
+        .then(
+          async ({
+            data,
+          }: {
+            data: { graph: { name: string; score: string }[]; improve: { subpart: string; comment: string }[] };
+          }) => {
+            console.log(data);
+            setAnnotations(data.improve);
+            setCurrentSkills(data.graph);
+            for (let item of data.improve) {
+              const searchResults: Word.RangeCollection = context.document.body.search(item.subpart);
+              const firstResult = searchResults.getFirstOrNullObject();
+              if (firstResult) firstResult.insertComment(item.comment);
+              await context.sync();
+            }
+            setLoading(false);
+            toast.success("Annotation complete successfully!", { position: "top-right" });
           }
-          setLoading(false);
-          toast.success("Annotation complete successfully!", { position: "top-right" });
-        });
+        );
     });
   };
 
@@ -107,13 +87,13 @@ const App: React.FC = () => {
     const newDraft = {
       id: drafts.length + 1,
       date: new Date().toLocaleDateString(),
-      skills: currentSkills,
+      // skills: currentSkills,
     };
     setDrafts([...drafts, newDraft]);
 
     // Update progress data
-    const averageScore = currentSkills.reduce((sum, skill) => sum + skill.score, 0) / currentSkills.length;
-    setProgressData([...progressData, { draft: newDraft.id, score: averageScore }]);
+    // const averageScore = currentSkills.reduce((sum, skill) => sum + skill.score, 0) / currentSkills.length;
+    // setProgressData([...progressData, { draft: newDraft.id, score: averageScore }]);
 
     console.log("Submitting draft:", newDraft);
     // Here you would send the draft to your backend/API
@@ -140,8 +120,6 @@ const App: React.FC = () => {
 
       setInputMessage("");
 
-      console.log(reqData);
-
       fetch("http://localhost:8000/api/chat", {
         method: "POST",
         body: JSON.stringify(reqData),
@@ -156,17 +134,18 @@ const App: React.FC = () => {
 
   return (
     <div className="h-full w-full">
-      <ToastContainer />
-      <div className="flex flex-col h-screen max-w-md mx-auto bg-background text-foreground relative">
+      <div className="flex flex-col min-h-screen max-w-md mx-auto bg-background text-foreground relative">
         <Card className="border-none rounded-none">
           <CardHeader>
             <CardTitle className="text-2xl font-bold">Mark My Words</CardTitle>
             <p className="text-sm text-muted-foreground">AI-powered analysis for your writing tasks</p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Select onValueChange={setSelectedTask} defaultValue={selectedTask}>
+            <Select onValueChange={(e) => setSelectedTask(e.target.value)} defaultValue={selectedTask}>
               {taskTypes.map((task) => (
-                <SelectItem value={task.value}>{task.label}</SelectItem>
+                <SelectItem key={task.value} value={task.value}>
+                  {task.label}
+                </SelectItem>
               ))}
             </Select>
             <div className="flex space-x-2">
@@ -295,4 +274,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+export default AnnotationPage;
