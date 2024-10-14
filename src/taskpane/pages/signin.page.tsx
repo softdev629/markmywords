@@ -17,20 +17,18 @@ const SigninPage: React.FC = () => {
       let userToken = jwtDecode(userTokenEncoded);
       const email = userToken["preferred_username"];
       if (email) {
-        fetch("https://dev.markmywords.tech/api/admin/email", {
+        fetch("http://localhost:8000/api/signin", {
           method: "POST",
           headers: {
-            Authentication: "Bearer 01923272-490c-7fa4-ba32-a7af7235be06",
             "content-type": "application/json",
           },
           body: JSON.stringify({ email }),
         })
           .then((res) => res.json())
-          .then((data) => {
+          .then(({ data }) => {
             if (data.exists) history.push("/annotate");
             else history.push("/unathenticate");
           });
-        history.push("/unathenticate");
       }
     } catch (err) {
       console.log(err);
