@@ -3,6 +3,7 @@ import { jwtDecode } from "jwt-decode";
 import { useHistory } from "react-router-dom";
 
 import { Button } from "../components/button";
+import { toast } from "react-toastify";
 
 const SigninPage: React.FC = () => {
   const history = useHistory();
@@ -26,8 +27,13 @@ const SigninPage: React.FC = () => {
         })
           .then((res) => res.json())
           .then(({ data }) => {
-            if (data.exists) history.push("/annotate");
-            else history.push("/unathenticate");
+            if (data.exists) {
+              history.push("/annotate");
+              toast.success("Signin successfully!");
+            } else {
+              history.push("/unathenticate");
+              toast.error("You are not registerd!");
+            }
           });
       }
     } catch (err) {
